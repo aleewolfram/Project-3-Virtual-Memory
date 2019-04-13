@@ -15,25 +15,25 @@
 #define TLB_SIZE 16
 
 //------Main Memory------
-int physicalMemory[FRAME_SIZE][FRAME_SIZE]; //total 65,536 bytes
+unsigned int physicalMemory[FRAME_SIZE][FRAME_SIZE]; //total 65,536 bytes
 
 //------Page Table------
-int pageTablePages[PAGE_TABLE_SIZE]; //pages
-int pageTableFrames[PAGE_TABLE_SIZE]; //frames
+unsigned int pageTablePages[PAGE_TABLE_SIZE]; //pages
+unsigned int pageTableFrames[PAGE_TABLE_SIZE]; //frames
 int pageFaults = 0;
 int pageTableFrameCounter = 0;
 
 //------TBL------
-int page_num_TLB[TLB_SIZE]; //pages
-int frame_num_TLB[TLB_SIZE]; //frames
+unsigned int page_num_TLB[TLB_SIZE]; //pages
+unsigned int frame_num_TLB[TLB_SIZE]; //frames
 int tlbHit = 0;
 int tlbFrameCounter = 0;
 
 int frameCounter = 0;
 
 //------Holds Final Values------
-int virtualAddresses[1000];
-int physicalAddresses[1000];
+unsigned int virtualAddresses[1000];
+unsigned int physicalAddresses[1000];
 int8_t values[1000];
 int8_t value;
 
@@ -58,13 +58,13 @@ void getpage_offset(unsigned int x) {
          (page << 8) | getoffset(x), page * 256 + offset);
 }
 
-void translationLookasideBuffer(int pageNumber, int numFrame) //using FIFO
+void translationLookasideBuffer(int page, int numFrame) //using FIFO
 {
    int tlbCount = 0;
    for(int i = 0; i < tlbFrameCounter; i++)
    {
      tlbCount++;
-       if(page_num_TLB[i] == pageNumber){
+       if(page_num_TLB[i] == page){
            break;
        }
    }
@@ -74,7 +74,7 @@ void translationLookasideBuffer(int pageNumber, int numFrame) //using FIFO
        if(tlbFrameCounter < TLB_SIZE)
        {
          frame_num_TLB[tlbFrameCounter] = numFrame;
-         page_num_TLB[tlbFrameCounter] = pageNumber;
+         page_num_TLB[tlbFrameCounter] = page;
        }
        else
        {
@@ -85,7 +85,7 @@ void translationLookasideBuffer(int pageNumber, int numFrame) //using FIFO
          }
 
         frame_num_TLB[tlbFrameCounter-1] = numFrame;
-        page_num_TLB[tlbFrameCounter-1] = pageNumber;
+        page_num_TLB[tlbFrameCounter-1] = page;
        }
    }
    else
@@ -98,12 +98,12 @@ void translationLookasideBuffer(int pageNumber, int numFrame) //using FIFO
 
        if(tlbFrameCounter < TLB_SIZE)
        {
-         page_num_TLB[tlbFrameCounter] = pageNumber;
+         page_num_TLB[tlbFrameCounter] = page;
          frame_num_TLB[tlbFrameCounter] = numFrame;
        }
        else
        {
-         page_num_TLB[tlbFrameCounter-1] = pageNumber;
+         page_num_TLB[tlbFrameCounter-1] = page;
          frame_num_TLB[tlbFrameCounter-1] = numFrame;
        }
    }
@@ -114,9 +114,9 @@ void translationLookasideBuffer(int pageNumber, int numFrame) //using FIFO
    }
 }
 
-void loadToMemory(int pageNumber)
+void loadToMemory(int page)
 {
-   fseek(fbin, pageNumber * BUFLEN, SEEK_SET);
+   fseek(fbin, page * BUFLEN, SEEK_SET);
    fread(buffer, sizeof(signed char), BUFLEN, fbin);
 
    //reads into physical memory
@@ -125,24 +125,22 @@ void loadToMemory(int pageNumber)
      physicalMemory[frameCounter][i] = buffer[i];
    }
 
-   pageTablePages[pageTableFrameCounter] = pageNumber;
+   pageTablePages[pageTableFrameCounter] = page;
    pageTableFrames[pageTableFrameCounter] = frameCounter;
 
    frameCounter++;
    pageTableFrameCounter++;
 }
 
-void getPageFrame(int logic_add, int addNum)
+void getPageFrame(int logic_add, int addNum, unsigned int page, unsigned int offset)
 {
-   unsigned int pageNumber = getpage(logic_add);
-   unsigned int offset = getoffset(logic_add);
 
    int numFrame = 999;
 
    //try TLB first
    for(int i = 0; i < TLB_SIZE; i++)
    {
-     if(page_num_TLB[i] == pageNumber)
+     if(page_num_TLB[i] == page)
       {
          numFrame = frame_num_TLB[i];
          tlbHit++;
@@ -154,20 +152,20 @@ void getPageFrame(int logic_add, int addNum)
    {
        for(int i = 0; i < pageTableFrameCounter; i++)
        {
-         if(pageTablePages[i] == pageNumber)
+         if(pageTablePages[i] == page)
            numFrame = pageTableFrames[i];
        }
 
        if(numFrame == 999) //page fault: if not in TBL or page table, load to physical memory
        {
-         loadToMemory(pageNumber);
+         loadToMemory(page);
          pageFaults++;
          numFrame = (frameCounter-1);
        }
    }
 
    value = physicalMemory[numFrame][offset];
-   translationLookasideBuffer(pageNumber, numFrame); // put into TLB
+   translationLookasideBuffer(page, numFrame); // put into TLB
 
    virtualAddresses[addNum] = logic_add;
    physicalAddresses[addNum] = (numFrame << 8) | offset;
@@ -198,9 +196,9 @@ int main(int argc, char *argv[])
       logic_add = atoi(address);
       fscanf(fcorr, "%s %s %d %s %s %d %s %d", buf, buf, &virt_add, buf, buf, &phys_add, buf, &value);  // read from file correct.txt
 
-      getPageFrame(logic_add,currentAddress);
       unsigned int page = getpage(logic_add);
       unsigned int offset = getoffset(logic_add);
+      getPageFrame(logic_add,currentAddress,page,offset);
 
       assert(physicalAddresses[currentAddress] == phys_add);
       printf("logical: %5u (page:%3u, offset:%3u) ---> physical: %5u -- passed ---> value: %d\n", virtualAddresses[currentAddress], page, offset, physicalAddresses[currentAddress], values[currentAddress]);
