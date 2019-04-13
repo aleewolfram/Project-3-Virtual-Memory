@@ -24,10 +24,11 @@ int pageFaults = 0;
 int pageTableFrameCounter = 0;
 
 //------TBL------
-unsigned int page_num_TLB[TLB_SIZE]; //pages
-unsigned int frame_num_TLB[TLB_SIZE]; //frames
+unsigned int TLBpages[TLB_SIZE]; //pages
+unsigned int TLBframes[TLB_SIZE]; //frames
 int tlbHit = 0;
 int tlbFrameCounter = 0;
+int tlbLRUCounter[TLB_SIZE]; // for use with LRU replacement policy
 
 int frameCounter = 0;
 
@@ -60,51 +61,55 @@ void getpage_offset(unsigned int x) {
 
 void translationLookasideBuffer(int page, int numFrame) //using FIFO
 {
+  ///-------LRU-------
+  // increments an parralell array with the page table to tell when entrys are used
+  // tlbLRUCounter[tlbFrameCounter] += 1;
+  //
+
    int tlbCount = 0;
    for(int i = 0; i < tlbFrameCounter; i++)
    {
      tlbCount++;
-       if(page_num_TLB[i] == page){
+       if(TLBpages[i] == page)
            break;
-       }
    }
 
    if(tlbCount == tlbFrameCounter)
    {
        if(tlbFrameCounter < TLB_SIZE)
        {
-         frame_num_TLB[tlbFrameCounter] = numFrame;
-         page_num_TLB[tlbFrameCounter] = page;
+         TLBframes[tlbFrameCounter] = numFrame;
+         TLBpages[tlbFrameCounter] = page;
        }
        else
        {
         for(int i = 0; i < (TLB_SIZE-1); i++)
          {
-           frame_num_TLB[i] = frame_num_TLB[i+1];
-           page_num_TLB[i] = page_num_TLB[i+1];
+           TLBframes[i] = TLBframes[i+1];
+           TLBpages[i] = TLBpages[i+1];
          }
 
-        frame_num_TLB[tlbFrameCounter-1] = numFrame;
-        page_num_TLB[tlbFrameCounter-1] = page;
+        TLBframes[tlbFrameCounter-1] = numFrame;
+        TLBpages[tlbFrameCounter-1] = page;
        }
    }
-   else
+   else //if not equal
    {
        for(int i = tlbCount; i < (tlbFrameCounter-1); i++)
        {
-         frame_num_TLB[i] = frame_num_TLB[i+1];
-         page_num_TLB[i] = page_num_TLB[i+1];
+         TLBframes[i] = TLBframes[i+1];
+         TLBpages[i] = TLBpages[i+1];
        }
 
-       if(tlbFrameCounter < TLB_SIZE)
+       if(tlbFrameCounter < TLB_SIZE)// if tlbFrameCounter is less than the tlb size
        {
-         page_num_TLB[tlbFrameCounter] = page;
-         frame_num_TLB[tlbFrameCounter] = numFrame;
+         TLBpages[tlbFrameCounter] = page;
+         TLBframes[tlbFrameCounter] = numFrame;
        }
-       else
+       else // if tlbFrameCounter is less than the tlb size
        {
-         page_num_TLB[tlbFrameCounter-1] = page;
-         frame_num_TLB[tlbFrameCounter-1] = numFrame;
+         TLBpages[tlbFrameCounter-1] = page;
+         TLBframes[tlbFrameCounter-1] = numFrame;
        }
    }
 
@@ -140,9 +145,9 @@ void getPageFrame(int logic_add, int addNum, unsigned int page, unsigned int off
    //try TLB first
    for(int i = 0; i < TLB_SIZE; i++)
    {
-     if(page_num_TLB[i] == page)
+     if(TLBpages[i] == page)
       {
-         numFrame = frame_num_TLB[i];
+         numFrame = TLBframes[i];
          tlbHit++;
       }
    }
@@ -206,8 +211,8 @@ int main(int argc, char *argv[])
        currentAddress++;
    }
 
-   printf("Page Fault Rate: %.1f%%\n",(pageFaults/1000.0)*100);
-   printf("TLB Hit Rate: %.1f%%\n", (tlbHit/1000.0)*100);
+   printf("Page fault is: %d, Page Fault Rate: %.1f%%\n", pageFaults,(pageFaults/1000.0)*100);
+   printf("TLB hits is: %d, TLB Hit Rate: %.1f%%\n", tlbHit, (tlbHit/1000.0)*100);
 
    fclose(fadd);
    fclose(fcorr);
