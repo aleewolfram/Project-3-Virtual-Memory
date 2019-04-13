@@ -63,9 +63,17 @@ void translationLookasideBuffer(int page, int numFrame) //using FIFO
 {
   ///-------LRU-------
   // increments an parralell array with the page table to tell when entrys are used
-  // tlbLRUCounter[tlbFrameCounter] += 1;
-  //
-
+  /* tlbLRUCounter[tlbFrameCounter] += 1;
+  int min = tlbLRUCounter[tlbFrameCounter];
+   for(int i = 0; i < TLB_SIZE; ++i)
+  {
+    if(tlbLRUCounter[i] < min)
+    {
+      min = tlbLRUCounter[tlbFrameCounter];
+    }
+  }
+  */
+  //so now get rid of the min used value and replace
    int tlbCount = 0;
    for(int i = 0; i < tlbFrameCounter; i++)
    {
